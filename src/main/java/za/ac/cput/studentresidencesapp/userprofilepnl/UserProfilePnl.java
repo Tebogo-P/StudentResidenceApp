@@ -1,7 +1,6 @@
 package za.ac.cput.studentresidencesapp.userprofilepnl;
 
 import java.awt.*;
-import java.awt.event.*;
 import java.io.File;
 import javax.swing.*;
 import za.ac.cput.studentresidencesapp.dao.DatabaseManager;
@@ -148,7 +147,7 @@ public class UserProfilePnl extends JPanel {
                 emailField.setText("");
                 emailLabel.setText("Deleted");
             } else {
-                JOptionPane.showMessageDialog(this, "Delete failed. Try again.", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Item Not Deleted", "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }

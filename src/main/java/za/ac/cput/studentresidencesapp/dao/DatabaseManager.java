@@ -5,40 +5,82 @@ import java.sql.*;
 
 public class DatabaseManager {
 
-    private static final String DB_URL = "jdbc:derby://localhost:1527/ResidenceDB";
+    private static final String DB_URL = "jdbc:derby://localhost:1527/ResidenceDB;create=true";
+    private static final String DB_USERNAME = "administrator";
+    private static final String DB_PASSWORD = "admin";
 
+    
     public static void initDatabase() {
-        try ( Connection conn = DriverManager.getConnection(DB_URL);  Statement stmt = conn.createStatement()) {
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
+             Statement stmt = conn.createStatement()) {
 
-            String createTable = "CREATE TABLE IF NOT EXISTS users ("
-                    + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                    + "name TEXT NOT NULL,"
-                    + "email TEXT UNIQUE NOT NULL,"
-                    + "password TEXT NOT NULL)";
-            stmt.execute(createTable);
+            DatabaseMetaData dbMeta = conn.getMetaData();
+            ResultSet tables = dbMeta.getTables(null, null, "USERS", null);
+
+            if (!tables.next()) {
+                String createTableSQL = "CREATE TABLE USERS ("
+                        + "ID INTEGER NOT NULL GENERATED ALWAYS AS IDENTITY (START WITH 1, INCREMENT BY 1), "
+                        + "NAME VARCHAR(100) NOT NULL, "
+                        + "EMAIL VARCHAR(100) UNIQUE NOT NULL, "
+                        + "PASSWORD VARCHAR(100) NOT NULL, "
+                        + "PRIMARY KEY (ID))";
+
+                stmt.executeUpdate(createTableSQL);
+                System.out.println("✅ USERS table created successfully.");
+            } else {
+                System.out.println("ℹ USERS table already exists.");
+            }
+
         } catch (SQLException e) {
+            System.err.println("Database initialization failed: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     public static boolean registerUser(String name, String email, String password) {
-        String sql = "INSERT INTO users(name, email, password) VALUES(?, ?, ?)";
-        try ( Connection conn = DriverManager.getConnection(DB_URL);  PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        String sql = "INSERT INTO USERS (NAME, EMAIL, PASSWORD) VALUES (?, ?, ?)";
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
             pstmt.setString(1, name);
             pstmt.setString(2, email);
             pstmt.setString(3, password);
             pstmt.executeUpdate();
             return true;
+
         } catch (SQLException e) {
-            System.out.println("Register failed: " + e.getMessage());
+            System.err.println("Register failed: " + e.getMessage());
             return false;
         }
     }
 
-    public static boolean updateUser(String originalEmail, String newName, String newEmail) {
-        String sql = "UPDATE users SET name = ?, email = ? WHERE email = ?";
+    public static User loginUser(String email, String password) {
+        String sql = "SELECT * FROM USERS WHERE EMAIL = ? AND PASSWORD = ?";
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-        try ( Connection conn = DriverManager.getConnection(DB_URL);  PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, email);
+            pstmt.setString(2, password);
+            ResultSet rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                return new User(
+                        rs.getString("NAME"),
+                        rs.getString("EMAIL"),
+                        rs.getString("PASSWORD")
+                );
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Login failed: " + e.getMessage());
+        }
+        return null;
+    }
+
+    public static boolean updateUser(String originalEmail, String newName, String newEmail) {
+        String sql = "UPDATE USERS SET NAME = ?, EMAIL = ? WHERE EMAIL = ?";
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, newName);
             pstmt.setString(2, newEmail);
@@ -48,58 +90,57 @@ public class DatabaseManager {
             return rowsAffected > 0;
 
         } catch (SQLException e) {
-            System.out.println("Update failed: " + e.getMessage());
+            System.err.println("Update failed: " + e.getMessage());
             return false;
         }
-    }
-
-    public static User loginUser(String email, String password) {
-        String sql = "SELECT * FROM users WHERE email = ? AND password = ?";
-        try ( Connection conn = DriverManager.getConnection(DB_URL);  PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, email);
-            pstmt.setString(2, password);
-
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                return new User(
-                        rs.getString("name"),
-                        rs.getString("email"),
-                        rs.getString("password")
-                );
-            }
-        } catch (SQLException e) {
-            System.out.println("Login failed: " + e.getMessage());
-        }
-        return null;
     }
 
     public static boolean deleteUser(String email) {
-        try ( Connection conn = DriverManager.getConnection(DB_URL)) {
-            PreparedStatement ps = conn.prepareStatement("DELETE FROM USER WHERE EMAIL = ?");
-            ps.setString(1, email);
-            int rowsAffected = ps.executeUpdate();
+        String sql = "DELETE FROM USERS WHERE EMAIL = ?";
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, email);
+            int rowsAffected = pstmt.executeUpdate();
             return rowsAffected > 0;
-        } catch (Exception e) {
-            e.printStackTrace();
+
+        } catch (SQLException e) {
+            System.err.println("Delete failed: " + e.getMessage());
             return false;
         }
     }
-    
+
     public static boolean changePassword(String email, String oldPassword, String newPassword) {
-    String sql = "UPDATE users SET password = ? WHERE email = ? AND password = ?";
-    try (Connection conn = DriverManager.getConnection(DB_URL);
-         PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        String sql = "UPDATE USERS SET PASSWORD = ? WHERE EMAIL = ? AND PASSWORD = ?";
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-        pstmt.setString(1, newPassword);
-        pstmt.setString(2, email);
-        pstmt.setString(3, oldPassword);
-        int rowsAffected = pstmt.executeUpdate();
-        return rowsAffected > 0;
+            pstmt.setString(1, newPassword);
+            pstmt.setString(2, email);
+            pstmt.setString(3, oldPassword);
 
-    } catch (SQLException e) {
-        System.out.println("Password change failed: " + e.getMessage());
-        return false;
+            int rowsAffected = pstmt.executeUpdate();
+            return rowsAffected > 0;
+
+        } catch (SQLException e) {
+            System.err.println("Password change failed: " + e.getMessage());
+            return false;
+        }
     }
-}
 
+    public static void printAllUsers() {
+        String sql = "SELECT * FROM USERS";
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            System.out.println("\nCurrent Users:");
+            while (rs.next()) {
+                System.out.printf(" - %s (%s)%n", rs.getString("NAME"), rs.getString("EMAIL"));
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Failed to print users: " + e.getMessage());
+        }
+    }
 }

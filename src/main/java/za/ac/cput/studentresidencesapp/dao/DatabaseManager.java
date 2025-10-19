@@ -4,12 +4,14 @@ import za.ac.cput.studentresidencesapp.user.User;
 import java.sql.*;
 
 public class DatabaseManager {
-
+           
     private static final String DB_URL = "jdbc:derby://localhost:1527/ResidenceDB;create=true";
     private static final String DB_USERNAME = "administrator";
     private static final String DB_PASSWORD = "admin";
 
-    
+    private static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD); //help to get connection in one place
+    }
     public static void initDatabase() {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
              Statement stmt = conn.createStatement()) {
@@ -49,11 +51,17 @@ public class DatabaseManager {
             return true;
 
         } catch (SQLException e) {
+            String sqlState = e.getSQLState();
+            if (sqlState != null && sqlState.equals(23505))
+                System.err.println("Register failed: email already exists.");
+             else {
             System.err.println("Register failed: " + e.getMessage());
-            return false;
+            }
         }
+        return false;
     }
 
+    
     public static User loginUser(String email, String password) {
         String sql = "SELECT * FROM USERS WHERE EMAIL = ? AND PASSWORD = ?";
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
@@ -129,7 +137,7 @@ public class DatabaseManager {
     }
 
     public static void printAllUsers() {
-        String sql = "SELECT * FROM USERS";
+        String sql = "SELECT ID,NAME,EMAIL FROM USERS";
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
